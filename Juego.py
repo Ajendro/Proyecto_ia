@@ -511,9 +511,6 @@ while True:
 
     # 2 Jugadores
     elif jug == 2:
-        # Encontramos la segunda mano
-        lista2, bbox2, jug2 = detector.encontrarposicion(frame, ManoNum=1, dibujar=True, color = [255,0,0])
-
         # Dividimos pantalla
         cv2.line(frame, (cx, 0), (cx, 240), (255, 0, 0), 2)
         cv2.line(frame, (cx, 240), (cx, 480), (0, 255, 0), 2)
