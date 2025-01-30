@@ -21,7 +21,7 @@ contador_IA = 0
 conteo = 0
 
 # Accedemos a la carpeta
-path = 'Imagenes'
+path = 'Proyecto_ia/Imagenes'
 images = []
 clases = []
 lista = os.listdir(path)
