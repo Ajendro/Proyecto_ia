@@ -1,37 +1,33 @@
-#------------------------------ Importamos las librerías -----------------------------------
 import math
 import cv2
 import mediapipe as mp
 import time
 
-#-------------------------------- Creamos una clase ---------------------------------
 class detectormanos():
-    #------------------- Inicializamos los parámetros de la detección ----------------
-    def __init__(self, mode=False, maxManos=2, model_complexity=1, Confdeteccion=0.5, Confsegui=0.5):
-        self.mode = mode          # Creamos el objeto y el tendrá su propia variable
-        self.maxManos = maxManos  # Lo mismo haremos con todos los objetos
-        self.compl = model_complexity
+    def __init__(self, mode=False, maxManos=2, model_complexity=0, Confdeteccion=0.8, Confsegui=0.5):
+        self.mode = mode
+        self.maxManos = maxManos
+        self.compl = model_complexity  # Reducido a 0 para mejorar velocidad
         self.Confdeteccion = Confdeteccion
         self.Confsegui = Confsegui
 
-        # ---------------------------- Creamos los objetos que detectarán las manos y las dibujarán ----------------------
         self.mpmanos = mp.solutions.hands
         self.manos = self.mpmanos.Hands(self.mode, self.maxManos, self.compl, self.Confdeteccion, self.Confsegui)
         self.dibujo = mp.solutions.drawing_utils
         self.tip = [4, 8, 12, 16, 20]
 
-    #---------------------------------------- Función para encontrar las manos -----------------------------------
     def encontrarmanos(self, frame, dibujar=True):
+        # Reducir la resolución de la imagen para mejorar la velocidad
+        frame = cv2.resize(frame, (640, 480))  # Reducir la imagen a 640x480
         imgcolor = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         self.resultados = self.manos.process(imgcolor)
 
         if self.resultados.multi_hand_landmarks:
             for mano in self.resultados.multi_hand_landmarks:
                 if dibujar:
-                    self.dibujo.draw_landmarks(frame, mano, self.mpmanos.HAND_CONNECTIONS)  # Dibujamos las conexiones de los puntos
+                    self.dibujo.draw_landmarks(frame, mano, self.mpmanos.HAND_CONNECTIONS)
         return frame
 
-    #------------------------------------ Función para encontrar la posición ----------------------------------
     def encontrarposicion(self, frame, ManoNum=0, dibujar=True, color=[]):
         xlista = []
         ylista = []
@@ -43,23 +39,21 @@ class detectormanos():
             prueba = self.resultados.multi_hand_landmarks
             player = len(prueba)
             for id, lm in enumerate(miMano.landmark):
-                alto, ancho, c = frame.shape  # Extraemos las dimensiones de los fps
-                cx, cy = int(lm.x * ancho), int(lm.y * alto)  # Convertimos la información en píxeles
+                alto, ancho, c = frame.shape
+                cx, cy = int(lm.x * ancho), int(lm.y * alto)
                 xlista.append(cx)
                 ylista.append(cy)
                 self.lista.append([id, cx, cy])
                 if dibujar:
-                    cv2.circle(frame, (cx, cy), 3, (0, 0, 0), cv2.FILLED)  # Dibujamos un círculo
+                    cv2.circle(frame, (cx, cy), 3, (0, 0, 0), cv2.FILLED)
 
             xmin, xmax = min(xlista), max(xlista)
             ymin, ymax = min(ylista), max(ylista)
             bbox = xmin, ymin, xmax, ymax
             if dibujar:
-                # Dibujamos cuadro
                 cv2.rectangle(frame, (xmin - 20, ymin - 20), (xmax + 20, ymax + 20), color, 2)
         return self.lista, bbox, player
 
-    #---------------------------------- Función para detectar y dibujar los dedos arriba ------------------------
     def dedosarriba(self):
         dedos = []
         if self.lista[self.tip[0]][1] > self.lista[self.tip[0] - 1][1]:
@@ -75,7 +69,6 @@ class detectormanos():
 
         return dedos
 
-    #--------------------------- Función para detectar la distancia entre dedos ----------------------------
     def distancia(self, p1, p2, frame, dibujar=True, r=15, t=3):
         x1, y1 = self.lista[p1][1:]
         x2, y2 = self.lista[p2][1:]
@@ -89,21 +82,16 @@ class detectormanos():
 
         return length, frame, [x1, y1, x2, y2, cx, cy]
 
-#----------------------------------------------- Función principal -------------------------------------------------
 def main():
     ptiempo = 0
     ctiempo = 0
 
-    # ------------------------------------- Leemos la cámara web ---------------------------------------------
+    # Abrimos la cámara web
     cap = cv2.VideoCapture(0)
+    cap.set(cv2.CAP_PROP_FPS, 60)
 
-    # Configuramos los FPS de la cámara, si es posible
-    cap.set(cv2.CAP_PROP_FPS, 60)  # Cambia 60 por el valor máximo soportado por tu cámara
-
-    # ------------------------------------- Creamos el objeto -------------------------------------
     detector = detectormanos()
 
-    # ----------------------------- Realizamos la detección de manos ---------------------------------------
     while True:
         ret, frame = cap.read()
         
@@ -111,11 +99,11 @@ def main():
             print("No se pudo leer el frame de la cámara.")
             break
 
-        # Una vez que obtengamos la imagen, la enviaremos
+        # Detección de manos
         frame = detector.encontrarmanos(frame)
         lista, bbox, _ = detector.encontrarposicion(frame)
 
-        # ---------------------------------------- Mostramos los FPS ---------------------------------------
+        # Calcular y mostrar FPS
         ctiempo = time.time()
         fps = 1 / (ctiempo - ptiempo)
         ptiempo = ctiempo
@@ -125,7 +113,7 @@ def main():
         cv2.imshow("Manos", frame)
         k = cv2.waitKey(1)
 
-        if k == 27:  # Presionar "Esc" para salir
+        if k == 27:  # Esc para salir
             break
 
     cap.release()

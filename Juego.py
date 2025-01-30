@@ -16,6 +16,8 @@ fgus = False    # Bandera gana Usuario
 femp = False    # Bandera empate
 fder = False    # Bandera derecha
 fizq = False    # Bandera izquierda
+contador_usuario = 0
+contador_IA = 0
 conteo = 0
 
 # Accedemos a la carpeta
@@ -62,24 +64,20 @@ while True:
     # Posiciones mano 1
     lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color = [0,255,0])
 
-    # 1 Jugador
+    # Verifica si hay una mano detectada (cuando la mano se levanta, el valor de jug será 1)
     if jug == 1:
-        # Dividimos pantalla
-        cv2.line(frame, (cx,0), (cx,480), (0,255,0), 2)
+            # Empieza el juego directamente al detectar la mano levantada
 
-        # Mostramos jugadores
-        cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
-        cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71,(0, 255, 0), 2)
+            # Dividimos pantalla
+            cv2.line(frame, (cx, 0), (cx, 480), (0, 255, 0), 2)
 
-        # Mensaje inicio
-        cv2.rectangle(frame, (145, 425), (465, 460), (0, 0, 0), -1)
-        cv2.putText(frame, 'PRESIONA S PARA EMPEZAR', (150, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
+            # Mostramos jugadores
+            cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
+            cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
 
-        # Presiona S
-        if t == 83 or t == 115 or fs == True:
-            # Cambiamos bandera 's'
-            fs = True
-            # Obtenemos posicion de la mano
+            # Ahora el juego empieza sin la necesidad de presionar "S"
+            # Sigue el flujo normal del juego
+                    # Obtenemos posicion de la mano
             if len(lista1) != 0:
                 # Extraemos las coordenadas del dedo corazon
                 x1, y1 = lista1[9][1:]
