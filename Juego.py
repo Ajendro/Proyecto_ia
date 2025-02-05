@@ -1,9 +1,11 @@
 # Importamos las librerias
 import cv2
 import random
-import SeguimientoManos as sm 
+import SeguimientoManos as sm  
 import os
 import imutils
+
+
 
 # Declaracion de variables
 fs = False
@@ -16,9 +18,12 @@ fgus = False    # Bandera gana Usuario
 femp = False    # Bandera empate
 fder = False    # Bandera derecha
 fizq = False    # Bandera izquierda
-contador_usuario = 0
-contador_IA = 0
 conteo = 0
+
+
+mano_levantada_tiempo = None
+juego_iniciado = False
+
 
 # Accedemos a la carpeta
 path = 'Imagenes'
@@ -43,7 +48,6 @@ cap = cv2.VideoCapture(0)
 # Declaramos el detector
 detector = sm.detectormanos(Confdeteccion=0.9)
 
-# Empezamos
 while True:
     # Lectura de la videocaptura
     ret, frame = cap.read()
@@ -57,28 +61,23 @@ while True:
     cy = int(al/2)
 
     # Espejo
-    frame = cv2.flip(frame,1)
+    frame = cv2.flip(frame, 1)
 
     # Encontramos las manos
     frame = detector.encontrarmanos(frame, dibujar=True)
     # Posiciones mano 1
-    lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color = [0,255,0])
+    lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color=[0, 255, 0])
 
-    # Verifica si hay una mano detectada (cuando la mano se levanta, el valor de jug será 1)
+    # 1 Jugador
     if jug == 1:
-            # Empieza el juego directamente al detectar la mano levantada
+        # Dividimos pantalla
+        cv2.line(frame, (cx, 0), (cx, 480), (0, 255, 0), 2)
 
-            # Dividimos pantalla
-            cv2.line(frame, (cx, 0), (cx, 480), (0, 255, 0), 2)
-
-            # Mostramos jugadores
-            cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
-            cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
-
-            # Ahora el juego empieza sin la necesidad de presionar "S"
-            # Sigue el flujo normal del juego
-                    # Obtenemos posicion de la mano
-            if len(lista1) != 0:
+        # Mostramos jugadores
+        cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
+        cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
+        
+        if len(lista1) != 0:
                 # Extraemos las coordenadas del dedo corazon
                 x1, y1 = lista1[9][1:]
 
@@ -507,22 +506,6 @@ while True:
                                 fizq = False
                                 conteo = 0
 
-    # 2 Jugadores
-    elif jug == 2:
-        # Dividimos pantalla
-        cv2.line(frame, (cx, 0), (cx, 240), (255, 0, 0), 2)
-        cv2.line(frame, (cx, 240), (cx, 480), (0, 255, 0), 2)
-
-        # Mostramos jugadores
-        cv2.rectangle(frame, (245, 25), (408, 60), (0, 0, 0), -1)
-        cv2.putText(frame, '2 JUGADORES', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (255, 0, 0), 2)
-
-        # Mensaje inicio
-        cv2.rectangle(frame, (145, 425), (465, 460), (0, 0, 0), -1)
-        cv2.putText(frame, 'PRESIONA S PARA EMPEZAR', (150, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (255, 0, 0), 2)
-
-        if t == 83 or t == 115:
-            print('EMPEZAMOS')
 
     # 0 Jugadores
     elif jug == 0:
