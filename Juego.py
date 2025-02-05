@@ -26,7 +26,7 @@ juego_iniciado = False
 
 
 # Accedemos a la carpeta
-path = 'Proyecto_ia/Imagenes'
+path = 'Imagenes'
 images = []
 clases = []
 lista = os.listdir(path)
