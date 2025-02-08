@@ -4,7 +4,7 @@ import mediapipe as mp
 import time
 
 class detectormanos():
-    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.7, Confsegui=0.7):
+    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.9, Confsegui=0.9):
         self.mode = mode
         self.maxManos = maxManos
         self.compl = model_complexity

@@ -18,8 +18,19 @@ fder = False    # Bandera derecha
 fizq = False    # Bandera izquierda
 conteo = 0
 
+# Contadores de victorias
+victorias_usuario = 0
+victorias_ia = 0
+rondas_jugadas = 0
+
+
+
 mano_levantada_tiempo = None
 juego_iniciado = False
+
+# Frame skip
+FRAME_SKIP = 2  # Procesar 1 de cada 2 frames
+frame_count = 0
 
 # Accedemos a la carpeta
 path = 'Imagenes'
@@ -94,6 +105,12 @@ def detect_gesture(lista1, is_left):
 while True:
     # Lectura de la videocaptura
     ret, frame = cap.read()
+
+    # Frame skip: Solo procesar 1 de cada FRAME_SKIP frames
+    frame_count += 1
+    if frame_count % FRAME_SKIP != 0:
+        continue
+
     # Leemos teclado
     t = cv2.waitKey(1)
 
@@ -109,6 +126,9 @@ while True:
     frame = detector.encontrarmanos(frame, dibujar=True)
     # Posiciones mano 1
     lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color=[0, 255, 0])
+    
+    cv2.putText(frame, f"Usuario: {victorias_usuario}  IA: {victorias_ia}", (10, 30), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     # 1 Jugador
     if jug == 1:
@@ -231,6 +251,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
                             # IA PIEDRA
                             elif juego == 4:
                                 # EMPATE
@@ -249,6 +270,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
                         # Papel
                         elif x2 > x22 and x3 > x33 and x4 > x44:
                             # IA PAPEL
@@ -268,6 +290,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
                             elif juego == 5:
                                 # GANA LA IA
                                 print('GANA LA IA')
@@ -276,6 +299,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
 
                         # Tijera
                         elif x2 > x22 and x3 > x33 and x4 < x44:
@@ -288,6 +312,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
                             # IA PIEDRA
                             elif juego == 4:
                                 # GANA LA IA
@@ -297,6 +322,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
                             elif juego == 5:
                                 # EMPATE
                                 print('EMPATE')
@@ -304,74 +330,76 @@ while True:
                                 fgus = False
                                 femp = True
                                 fr = True
-
                     # Mostramos ganador
                     # IA
                     if fgia == True:
-                        # Mostramos
                         gan = images[6]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Reset
-                        if t == 82 or t == 114:
-                            fs = False
-                            fu = False
-                            fd = False
-                            fj = False
-                            fr = False
-                            fgia = False
-                            fgus = False
-                            femp = False
-                            fder = False
-                            fizq = False
-                            conteo = 0
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
                     # USUARIO
                     elif fgus == True:
-                        # Mostramos
                         gan = images[7]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Reset
-                        if t == 82 or t == 114:
-                            fs = False
-                            fu = False
-                            fd = False
-                            fj = False
-                            fr = False
-                            fgia = False
-                            fgus = False
-                            femp = False
-                            fder = False
-                            fizq = False
-                            conteo = 0
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
                     # EMPATE
                     elif femp == True:
-                        # Mostramos
                         gan = images[8]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "¡EMPATE!", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-                        # Reset
-                        if t == 82 or t == 114:
-                            fs = False
-                            fu = False
-                            fd = False
-                            fj = False
-                            fr = False
-                            fgia = False
-                            fgus = False
-                            femp = False
-                            fder = False
-                            fizq = False
-                            conteo = 0
+                    # Incrementar el número de rondas jugadas
+                    rondas_jugadas += 1
 
+                    # Verificar si alguien ha ganado 3 veces
+                    if victorias_usuario == 3 or victorias_ia == 3:
+                        if victorias_usuario == 3:
+                            cv2.putText(frame, "¡GANASTE EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        elif victorias_ia == 3:
+                            cv2.putText(frame, "¡IA GANA EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        
+                        # Mostrar mensaje de reinicio después de la partida completa
+                        cv2.putText(frame, "Presiona 'r' para reiniciar", (120, 450), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                    # Reiniciar juego solo si alguien llegó a 3 victorias y se presiona 'r'
+                    if (t == 82 or t == 114) and (victorias_usuario == 3 or victorias_ia == 3):  # 'R' o 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
+                        victorias_usuario = 0
+                        victorias_ia = 0
+                        rondas_jugadas = 0  # Reiniciar rondas solo cuando se termine el juego
+                # Reset al presionar 'r'
+                    if t == 82 or t == 114:  # 82 es 'R' y 114 es 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
                 # Derecha
                 if fizq == False and fder == True:
                     # Mostramos
@@ -412,6 +440,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
                             # IA PIEDRA
                             elif juego == 4:
                                 # EMPATE
@@ -430,6 +459,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
 
                         # Papel
                         elif x2 < x22 and x3 < x33 and x4 < x44:
@@ -450,6 +480,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
                             elif juego == 5:
                                 # GANA LA IA
                                 print('GANA LA IA')
@@ -458,6 +489,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
 
                         # Tijera
                         elif x2 < x22 and x3 < x33 and x4 > x44:
@@ -470,6 +502,7 @@ while True:
                                 fgus = True
                                 femp = False
                                 fr = True
+                                victorias_usuario += 1
                             # IA PIEDRA
                             elif juego == 4:
                                 # GANA LA IA
@@ -479,6 +512,7 @@ while True:
                                 fgus = False
                                 femp = False
                                 fr = True
+                                victorias_ia += 1
                             elif juego == 5:
                                 # EMPATE
                                 print('EMPATE')
@@ -487,140 +521,65 @@ while True:
                                 femp = True
                                 fr = True
 
-                    # Mostramos ganador
-                    # IA
-                    if fgia == True:
-                        # Mostramos
-                        gan = images[6]
-                        alig, anig, c = gan.shape
-                        # Mostramos imagen
-                        frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Reset
-                        if t == 82 or t == 114:
-                            fs = False
-                            fu = False
-                            fd = False
-                            fj = False
-                            fr = False
-                            fgia = False
-                            fgus = False
-                            femp = False
-                            fder = False
-                            fizq = False
-                            conteo = 0
-
-                    # USUARIO
-                    elif fgus == True:
-                        # Mostramos
-                        gan = images[7]
-                        alig, anig, c = gan.shape
-                        # Mostramos imagen
-                        frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Reset
-                        if t == 82 or t == 114:
-                            fs = False
-                            fu = False
-                            fd = False
-                            fj = False
-                            fr = False
-                            fgia = False
-                            fgus = False
-                            femp = False
-                            fder = False
-                            fizq = False
-                            conteo = 0
-
-                            # USUARIO
-                        elif fgus == True:
-                                # Mostramos
-                                gan = images[7]
-                                alig, anig, c = gan.shape
-                                # Mostramos imagen
-                                frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                                # Reset
-                                if t == 82 or t == 114:
-                                    fs = False
-                                    fu = False
-                                    fd = False
-                                    fj = False
-                                    fr = False
-                                    fgia = False
-                                    fgus = False
-                                    femp = False
-                                    fder = False
-                                    fizq = False
-                                    conteo = 0
-
-                            # EMPATE
-                        elif femp == True:
-                                # Mostramos
-                                gan = images[8]
-                                alig, anig, c = gan.shape
-                                # Mostramos imagen
-                                frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                                # Reset
-                                if t == 82 or t == 114:
-                                    fs = False
-                                    fu = False
-                                    fd = False
-                                    fj = False
-                                    fr = False
-                                    fgia = False
-                                    fgus = False
-                                    femp = False
-                                    fder = False
-                                    fizq = False
-                                    conteo = 0
-
-
     if jug == 1:
-                    # Mostramos ganador
+                     # Mostramos ganador
                     # IA
                     if fgia == True:
-                        # Mostramos
                         gan = images[6]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Mostramos texto del ganador
-                        cv2.putText(frame, "¡IA GANA!", (200, 400), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
                     # USUARIO
                     elif fgus == True:
-                        # Mostramos
                         gan = images[7]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Mostramos texto del ganador
-                        cv2.putText(frame, "¡GANASTE!", (200, 400), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
                     # EMPATE
                     elif femp == True:
-                        # Mostramos
                         gan = images[8]
                         alig, anig, c = gan.shape
-                        # Mostramos imagen
                         frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                        # Mostramos texto del empate
                         cv2.putText(frame, "¡EMPATE!", (200, 400), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                        
+                    # Incrementar el número de rondas jugadas
+                    rondas_jugadas += 1
 
-                    # Mostrar mensaje de reset
-                    if fgia or fgus or femp:
-                        cv2.putText(frame, "Presiona 'r' para jugar de nuevo", (150, 450), 
-                                  cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    # Verificar si alguien ha ganado 3 veces
+                    if victorias_usuario == 3 or victorias_ia == 3:
+                        if victorias_usuario == 3:
+                            cv2.putText(frame, "¡GANASTE EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        elif victorias_ia == 3:
+                            cv2.putText(frame, "¡IA GANA EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        
+                        # Mostrar mensaje de reinicio después de la partida completa
+                        cv2.putText(frame, "Presiona 'r' para reiniciar", (120, 450), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
-                    # Reset al presionar 'r'
+                    # Reiniciar juego solo si alguien llegó a 3 victorias y se presiona 'r'
+                    if (t == 82 or t == 114) and (victorias_usuario == 3 or victorias_ia == 3):  # 'R' o 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
+                        victorias_usuario = 0
+                        victorias_ia = 0
+                        rondas_jugadas = 0  # Reiniciar rondas solo cuando se termine el juego
+                # Reset al presionar 'r'
                     if t == 82 or t == 114:  # 82 es 'R' y 114 es 'r'
                         fs = False
                         fu = False
@@ -633,6 +592,7 @@ while True:
                         fder = False
                         fizq = False
                         conteo = 0
+                        
 
     # 0 Jugadores (corregida la indentación)
     elif jug == 0:
