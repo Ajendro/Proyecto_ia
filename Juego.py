@@ -41,8 +41,9 @@ print(clases)
 # Lectura de la camara
 cap = cv2.VideoCapture(0)
 
+
 # Declaramos el detector
-detector = sm.detectormanos(Confdeteccion=0.9)
+detector = sm.detectormanos(Confdeteccion=0.7)
 
 def detect_gesture(lista1, is_left):
     """
@@ -93,7 +94,6 @@ def detect_gesture(lista1, is_left):
 while True:
     # Lectura de la videocaptura
     ret, frame = cap.read()
-
     # Leemos teclado
     t = cv2.waitKey(1)
 

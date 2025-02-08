@@ -4,7 +4,7 @@ import mediapipe as mp
 import time
 
 class detectormanos():
-    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.9, Confsegui=0.9):
+    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.7, Confsegui=0.7):
         self.mode = mode
         self.maxManos = maxManos
         self.compl = model_complexity
@@ -15,7 +15,7 @@ class detectormanos():
         self.mpmanos = mp.solutions.hands
         self.manos = self.mpmanos.Hands(self.mode, self.maxManos, self.compl, self.Confdeteccion, self.Confsegui)
         self.dibujo = mp.solutions.drawing_utils
-        self.tip = [4, 8, 12, 16, 20]
+        self.tip = [4, 8, 12, 16, 20]  # Puntos de referencia para las puntas de los dedos
 
     def encontrarmanos(self, frame, dibujar=True):
         imgcolor = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -93,10 +93,57 @@ class detectormanos():
         return longitud, frame, [x1, y1, x2, y2, cx, cy]
 
 
+def detect_gesture(lista1, is_left):
+    """
+    Detecta el gesto (piedra, papel, tijera) basado en la posición de los dedos
+    """
+    if len(lista1) == 0:
+        return "No detectado"
+        
+    # Extraemos valores de interés
+    # Punta DI
+    x2, _ = lista1[8][1:]
+    # Punta DC
+    x3, _ = lista1[12][1:]
+    # Punta DA
+    x4, _ = lista1[16][1:]
+
+    # Falange DI
+    x22, _ = lista1[6][1:]
+    # Falange DC
+    x33, _ = lista1[10][1:]
+    # Falange DA
+    x44, _ = lista1[14][1:]
+
+    # Verificamos si la mano está en la izquierda
+    if is_left:
+        # Piedra
+        if x2 < x22 and x3 < x33 and x4 < x44:
+            return "Piedra"
+        # Papel
+        elif x2 > x22 and x3 > x33 and x4 > x44:
+            return "Papel"
+        # Tijera
+        elif x2 > x22 and x3 > x33 and x4 < x44:
+            return "Tijera"
+    else:
+        # Piedra
+        if x2 > x22 and x3 > x33 and x4 > x44:
+            return "Piedra"
+        # Papel
+        elif x2 < x22 and x3 < x33 and x4 < x44:
+            return "Papel"
+        # Tijera
+        elif x2 < x22 and x3 < x33 and x4 > x44:
+            return "Tijera"
+    
+    return "Gesto no reconocido"
+
+
 def main():
     ptiempo = 0
     cap = cv2.VideoCapture(0)
-    detector = detectormanos()
+    detector = detectormanos(maxManos=1, Confdeteccion=0.7, model_complexity=1)
 
     while True:
         ret, frame = cap.read()
@@ -109,8 +156,19 @@ def main():
         nuevo_alto = int((nuevo_ancho / ancho) * alto)
         frame = cv2.resize(frame, (nuevo_ancho, nuevo_alto))
 
+        # Detectar manos
         frame = detector.encontrarmanos(frame, dibujar=True)
         lista, bbox, _ = detector.encontrarposicion(frame, dibujar=True)
+
+        # Determinar si la mano está en la izquierda o derecha
+        if len(lista) != 0:
+            # Obtener la coordenada x del centro de la mano
+            x_centro = (bbox[0] + bbox[2]) // 2
+            is_left = x_centro < (nuevo_ancho // 2)  # Verificar si está en la mitad izquierda
+
+            # Detectar el gesto
+            gesto = detect_gesture(lista, is_left)
+            cv2.putText(frame, f"Gesto: {gesto}", (10, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
         # Mostrar FPS
         ctiempo = time.time()
@@ -118,10 +176,14 @@ def main():
         ptiempo = ctiempo
         cv2.putText(frame, f"FPS: {int(fps)}", (10, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
 
-        cv2.imshow("Manos", frame)
-        if cv2.waitKey(1) & 0xFF == 27:  # Presionar 'Esc' para salir
+        # Mostrar el frame
+        cv2.imshow("Detector de Manos", frame)
+
+        # Salir con la tecla 'Esc'
+        if cv2.waitKey(1) & 0xFF == 27:
             break
 
+    # Liberar recursos
     cap.release()
     cv2.destroyAllWindows()
 
