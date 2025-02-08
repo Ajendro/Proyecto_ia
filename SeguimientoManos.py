@@ -4,7 +4,7 @@ import mediapipe as mp
 import time
 
 class detectormanos():
-    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.7, Confsegui=0.7):
+    def __init__(self, mode=False, maxManos=1, model_complexity=1, Confdeteccion=0.9, Confsegui=0.9):
         self.mode = mode
         self.maxManos = maxManos
         self.compl = model_complexity
@@ -102,6 +102,12 @@ def main():
         ret, frame = cap.read()
         if not ret:
             break
+
+        # Redimensionar el frame a un ancho de 800 píxeles manteniendo la relación de aspecto
+        alto, ancho = frame.shape[:2]
+        nuevo_ancho = 800
+        nuevo_alto = int((nuevo_ancho / ancho) * alto)
+        frame = cv2.resize(frame, (nuevo_ancho, nuevo_alto))
 
         frame = detector.encontrarmanos(frame, dibujar=True)
         lista, bbox, _ = detector.encontrarposicion(frame, dibujar=True)
