@@ -143,7 +143,7 @@ def detect_gesture(lista1, is_left):
 def main():
     ptiempo = 0
     cap = cv2.VideoCapture(0)
-    detector = detectormanos(maxManos=1, Confdeteccion=0.7, model_complexity=1)
+    detector = detectormanos(maxManos=1, Confdeteccion=0.9, model_complexity=1)
 
     while True:
         ret, frame = cap.read()
