@@ -23,10 +23,14 @@ victorias_usuario = 0
 victorias_ia = 0
 rondas_jugadas = 0
 
-
-
 mano_levantada_tiempo = None
 juego_iniciado = False
+contador_activo = False
+contador_tiempo = 0
+contador_etapas = ["Listo", "1", "2", "3"]
+contador_indice = 0
+mensaje_agitar = False
+ronda_activa = False
 
 # Frame skip
 FRAME_SKIP = 2  # Procesar 1 de cada 2 frames
@@ -52,9 +56,24 @@ print(clases)
 # Lectura de la camara
 cap = cv2.VideoCapture(0)
 
-
 # Declaramos el detector
 detector = sm.detectormanos(Confdeteccion=0.7)
+def is_hand_vertical(lista_landmarks):
+    if len(lista_landmarks) < 21:
+        return False
+    
+    # Coordenadas de referencia (muñeca y puntas de dedos)
+    wrist_y = lista_landmarks[0][2]      # Muñeca (landmark 0)
+    index_tip_y = lista_landmarks[8][2]  # Punta índice
+    middle_tip_y = lista_landmarks[12][2]# Punta medio
+    ring_tip_y = lista_landmarks[16][2]  # Punta anular
+    
+    # Verificar si los dedos están por encima de la muñeca (posición vertical)
+    vertical_threshold = 50  # Ajustar según necesidad
+    return (wrist_y - index_tip_y > vertical_threshold and 
+            wrist_y - middle_tip_y > vertical_threshold and 
+            wrist_y - ring_tip_y > vertical_threshold)
+
 
 def detect_gesture(lista1, is_left):
     """
@@ -102,6 +121,9 @@ def detect_gesture(lista1, is_left):
     
     return "Gesto no reconocido"
 
+
+
+
 while True:
     # Lectura de la videocaptura
     ret, frame = cap.read()
@@ -139,8 +161,8 @@ while True:
         cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
         cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
         
-        if len(lista1) != 0:
-            # Extraemos las coordenadas del dedo corazon
+    if len(lista1) != 0:
+            # Extraemos las coordenadas del dedo corazón
             x1, y1 = lista1[9][1:]
             
             # Determinamos si la mano está en la izquierda
@@ -150,12 +172,42 @@ while True:
             gesto = detect_gesture(lista1, is_left)
             
             # Dibujamos el texto del gesto
-            # Primero un rectángulo negro para mejor visibilidad
-            cv2.rectangle(frame, (x1-50, y1-50), (x1+100, y1-20), (0, 0, 0), -1)
-            # Luego el texto
-            cv2.putText(frame, f"Gesto: {gesto}", (x1-45, y1-30), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            cv2.rectangle(frame, (x1 - 50, y1 - 50), (x1 + 100, y1 - 20), (0, 0, 0), -1)
+            cv2.putText(frame, f"Gesto: {gesto}", (x1 - 45, y1 - 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
             
+            # Verificamos si la mano está en posición vertical
+            if is_hand_vertical(lista1) and not contador_activo and not ronda_activa:
+                contador_activo = True  # Activamos el contador
+                contador_tiempo = cv2.getTickCount()  # Guardamos el tiempo inicial
+                print("¡Mano en posición vertical! Contador iniciado.")
+            
+            # Si el contador está activo
+            if contador_activo:
+                tiempo_actual = (cv2.getTickCount() - contador_tiempo) / cv2.getTickFrequency()
+                
+                # Mostrar "Listo" y luego contar "1", "2", "3"
+                if tiempo_actual < 1:  # Mostrar "Listo" durante 1 segundo
+                    texto_contador = "Listo"
+                elif tiempo_actual < 2:  # Mostrar "1" durante 1 segundo
+                    texto_contador = "1"
+                elif tiempo_actual < 3:  # Mostrar "2" durante 1 segundo
+                    texto_contador = "2"
+                elif tiempo_actual < 4:  # Mostrar "3" durante 1 segundo
+                    texto_contador = "3"
+                else:
+                    contador_activo = False  # Finalizar el contador
+                    ronda_activa = True  # Iniciar la ronda
+                    print("¡Saca tu mano ahora!")
+                
+                # Dibujar el texto del contador en el centro de la pantalla
+                cv2.putText(frame, texto_contador, (cx - 50, cy), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
+
+            if ronda_activa:
+            # Mostrar mensaje para sacar la mano
+                cv2.putText(frame, "¡Saca tu mano ahora!", (cx - 200, cy + 100), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
             # Conteo de juego
             if conteo <= 2:
                 # Leemos la imagen inicial
@@ -400,6 +452,14 @@ while True:
                         fder = False
                         fizq = False
                         conteo = 0
+                        mano_levantada_tiempo = None  # Para la detección del gesto de mano levantada
+                        juego_iniciado = False  # El juego no ha comenzado
+                        contador_activo = False  # El contador no está activo
+                        contador_tiempo = 0  # El tiempo del contador comienza desde 0
+                        contador_etapas = ["Listo", "1", "2", "3"]  # Etapas del contador
+                        contador_indice = 0  # Índice para las etapas del contador
+                        mensaje_agitar = False  # Mensaje de agitar no mostrado
+                        ronda_activa = False  # No hay ronda activa
                 # Derecha
                 if fizq == False and fder == True:
                     # Mostramos
@@ -592,6 +652,14 @@ while True:
                         fder = False
                         fizq = False
                         conteo = 0
+                        mano_levantada_tiempo = None  # Para la detección del gesto de mano levantada
+                        juego_iniciado = False  # El juego no ha comenzado
+                        contador_activo = False  # El contador no está activo
+                        contador_tiempo = 0  # El tiempo del contador comienza desde 0
+                        contador_etapas = ["Listo", "1", "2", "3"]  # Etapas del contador
+                        contador_indice = 0  # Índice para las etapas del contador
+                        mensaje_agitar = False  # Mensaje de agitar no mostrado
+                        ronda_activa = False  # No hay ronda activa
                         
 
     # 0 Jugadores (corregida la indentación)
@@ -600,9 +668,14 @@ while True:
         cv2.rectangle(frame, (225, 25), (388, 60), (0, 0, 0), -1)
         cv2.putText(frame, '0 JUGADORES', (230, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
 
-        # Mensaje inicio
-        cv2.rectangle(frame, (115, 425), (480, 460), (0, 0, 0), -1)
-        cv2.putText(frame, 'LEVANTA TU MANO PARA INICIAR', (120, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
+        # Mensaje inicio en el centro de la pantalla
+        texto = 'LEVANTE SU MANO PARA INICIAR'
+        tamaño_texto = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
+        texto_x = (frame.shape[1] - tamaño_texto[0]) // 2
+        texto_y = (frame.shape[0] + tamaño_texto[1]) // 2
+
+        cv2.rectangle(frame, (texto_x - 10, texto_y - tamaño_texto[1] - 10), (texto_x + tamaño_texto[0] + 10, texto_y + 10), (0, 0, 0), -1)
+        cv2.putText(frame, texto, (texto_x, texto_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     # Mostramos frames
     cv2.imshow("JUEGO CON AI", frame)
