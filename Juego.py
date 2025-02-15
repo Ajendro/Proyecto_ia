@@ -170,23 +170,23 @@ while True:
             if detectar_mano_levantada(lista1) and not conteo_finalizado:
                 # Obtener dimensiones del frame
                 alto_frame, ancho_frame, _ = frame.shape
-                
-                # Texto y fuente
-                texto = "¡Listo!"
-                fuente = cv2.FONT_HERSHEY_SIMPLEX
-                escala_fuente = 2
-                grosor_fuente = 3
-                color_texto = (0, 0, 0)  # Negro
-                
-                # Obtener tamaño del texto
-                (ancho_texto, alto_texto), _ = cv2.getTextSize(texto, fuente, escala_fuente, grosor_fuente)
-                
-                # Calcular coordenadas para centrar el texto
-                x_texto = (ancho_frame - ancho_texto) // 2
-                y_texto = (alto_frame + alto_texto) // 2 -150  # Centrado verticalmente
-                
-                # Mostrar el texto en el centro del frame
-                cv2.putText(frame, texto, (x_texto, y_texto), fuente, escala_fuente, color_texto, grosor_fuente)
+                if not contador_iniciado:
+                    # Texto y fuente
+                    texto = "¡Listo!"
+                    fuente = cv2.FONT_HERSHEY_SIMPLEX
+                    escala_fuente = 2
+                    grosor_fuente = 3
+                    color_texto = (0, 0, 0)  # Negro
+                    
+                    # Obtener tamaño del texto
+                    (ancho_texto, alto_texto), _ = cv2.getTextSize(texto, fuente, escala_fuente, grosor_fuente)
+                    
+                    # Calcular coordenadas para centrar el texto
+                    x_texto = (ancho_frame - ancho_texto) // 2
+                    y_texto = (alto_frame + alto_texto) // 2 -150  # Centrado verticalmente
+                    
+                    # Mostrar el texto en el centro del frame
+                    cv2.putText(frame, texto, (x_texto, y_texto), fuente, escala_fuente, color_texto, grosor_fuente)
 
                 if not mano_levantada:
                     mano_levantada = True
@@ -217,8 +217,8 @@ while True:
                     texto = "¡Agite su mano!"
                     fuente = cv2.FONT_HERSHEY_SIMPLEX
                     escala_fuente = 2
-                    grosor_fuente = 3
-                    color_texto = (0, 0, 0) 
+                    grosor_fuente = 4
+                    color_texto = (0, 0, 255) 
 
                     # Obtener tamaño del texto
                     (ancho_texto, alto_texto), _ = cv2.getTextSize(texto, fuente, escala_fuente, grosor_fuente)
