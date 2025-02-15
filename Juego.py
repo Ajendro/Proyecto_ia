@@ -5,8 +5,6 @@ import SeguimientoManos as sm
 import os
 import imutils
 
-
-
 # Declaracion de variables
 fs = False
 fu = False      # Bandera up
@@ -20,10 +18,23 @@ fder = False    # Bandera derecha
 fizq = False    # Bandera izquierda
 conteo = 0
 
+# Contadores de victorias
+victorias_usuario = 0
+victorias_ia = 0
+rondas_jugadas = 0
 
 mano_levantada_tiempo = None
 juego_iniciado = False
+contador_activo = False
+contador_tiempo = 0
+contador_etapas = ["Listo", "1", "2", "3"]
+contador_indice = 0
+mensaje_agitar = False
+ronda_activa = False
 
+# Frame skip
+FRAME_SKIP = 2  # Procesar 1 de cada 2 frames
+frame_count = 0
 
 # Accedemos a la carpeta
 path = 'Imagenes'
@@ -46,11 +57,81 @@ print(clases)
 cap = cv2.VideoCapture(0)
 
 # Declaramos el detector
-detector = sm.detectormanos(Confdeteccion=0.9)
+detector = sm.detectormanos(Confdeteccion=0.7)
+def is_hand_vertical(lista_landmarks):
+    if len(lista_landmarks) < 21:
+        return False
+    
+    # Coordenadas de referencia (muñeca y puntas de dedos)
+    wrist_y = lista_landmarks[0][2]      # Muñeca (landmark 0)
+    index_tip_y = lista_landmarks[8][2]  # Punta índice
+    middle_tip_y = lista_landmarks[12][2]# Punta medio
+    ring_tip_y = lista_landmarks[16][2]  # Punta anular
+    
+    # Verificar si los dedos están por encima de la muñeca (posición vertical)
+    vertical_threshold = 50  # Ajustar según necesidad
+    return (wrist_y - index_tip_y > vertical_threshold and 
+            wrist_y - middle_tip_y > vertical_threshold and 
+            wrist_y - ring_tip_y > vertical_threshold)
+
+
+def detect_gesture(lista1, is_left):
+    """
+    Detecta el gesto (piedra, papel, tijera) basado en la posición de los dedos
+    """
+    if len(lista1) == 0:
+        return "No detectado"
+        
+    # Extraemos valores de interés
+    # Punta DI
+    x2, _ = lista1[8][1:]
+    # Punta DC
+    x3, _ = lista1[12][1:]
+    # Punta DA
+    x4, _ = lista1[16][1:]
+
+    # Falange DI
+    x22, _ = lista1[6][1:]
+    # Falange DC
+    x33, _ = lista1[10][1:]
+    # Falange DA
+    x44, _ = lista1[14][1:]
+
+    # Verificamos si la mano está en la izquierda
+    if is_left:
+        # Piedra
+        if x2 < x22 and x3 < x33 and x4 < x44:
+            return "Piedra"
+        # Papel
+        elif x2 > x22 and x3 > x33 and x4 > x44:
+            return "Papel"
+        # Tijera
+        elif x2 > x22 and x3 > x33 and x4 < x44:
+            return "Tijera"
+    else:
+        # Piedra
+        if x2 > x22 and x3 > x33 and x4 > x44:
+            return "Piedra"
+        # Papel
+        elif x2 < x22 and x3 < x33 and x4 < x44:
+            return "Papel"
+        # Tijera
+        elif x2 < x22 and x3 < x33 and x4 > x44:
+            return "Tijera"
+    
+    return "Gesto no reconocido"
+
+
+
 
 while True:
     # Lectura de la videocaptura
     ret, frame = cap.read()
+
+    # Frame skip: Solo procesar 1 de cada FRAME_SKIP frames
+    frame_count += 1
+    if frame_count % FRAME_SKIP != 0:
+        continue
 
     # Leemos teclado
     t = cv2.waitKey(1)
@@ -67,6 +148,9 @@ while True:
     frame = detector.encontrarmanos(frame, dibujar=True)
     # Posiciones mano 1
     lista1, bbox1, jug = detector.encontrarposicion(frame, ManoNum=0, dibujar=True, color=[0, 255, 0])
+    
+    cv2.putText(frame, f"Usuario: {victorias_usuario}  IA: {victorias_ia}", (10, 30), 
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     # 1 Jugador
     if jug == 1:
@@ -77,446 +161,521 @@ while True:
         cv2.rectangle(frame, (245, 25), (380, 60), (0, 0, 0), -1)
         cv2.putText(frame, '1 JUGADOR', (250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 255, 0), 2)
         
-        if len(lista1) != 0:
-                # Extraemos las coordenadas del dedo corazon
-                x1, y1 = lista1[9][1:]
+    if len(lista1) != 0:
+            # Extraemos las coordenadas del dedo corazón
+            x1, y1 = lista1[9][1:]
+            
+            # Determinamos si la mano está en la izquierda
+            is_left = x1 < cx
+            
+            # Detectamos el gesto actual
+            gesto = detect_gesture(lista1, is_left)
+            
+            # Dibujamos el texto del gesto
+            cv2.rectangle(frame, (x1 - 50, y1 - 50), (x1 + 100, y1 - 20), (0, 0, 0), -1)
+            cv2.putText(frame, f"Gesto: {gesto}", (x1 - 45, y1 - 30), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+            
+            # Verificamos si la mano está en posición vertical
+            if is_hand_vertical(lista1) and not contador_activo and not ronda_activa:
+                contador_activo = True  # Activamos el contador
+                contador_tiempo = cv2.getTickCount()  # Guardamos el tiempo inicial
+                print("¡Mano en posición vertical! Contador iniciado.")
+            
+            # Si el contador está activo
+            if contador_activo:
+                tiempo_actual = (cv2.getTickCount() - contador_tiempo) / cv2.getTickFrequency()
+                
+                # Mostrar "Listo" y luego contar "1", "2", "3"
+                if tiempo_actual < 1:  # Mostrar "Listo" durante 1 segundo
+                    texto_contador = "Listo"
+                elif tiempo_actual < 2:  # Mostrar "1" durante 1 segundo
+                    texto_contador = "1"
+                elif tiempo_actual < 3:  # Mostrar "2" durante 1 segundo
+                    texto_contador = "2"
+                elif tiempo_actual < 4:  # Mostrar "3" durante 1 segundo
+                    texto_contador = "3"
+                else:
+                    contador_activo = False  # Finalizar el contador
+                    ronda_activa = True  # Iniciar la ronda
+                    print("¡Saca tu mano ahora!")
+                
+                # Dibujar el texto del contador en el centro de la pantalla
+                cv2.putText(frame, texto_contador, (cx - 50, cy), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0), 3)
 
-                #print(conteo)
-                # Conteo de juego
-                if conteo <= 2:
-                    # Leemos la imagen inicial
-                    #print(name)
-                    img = images[conteo]
+            if ronda_activa:
+            # Mostrar mensaje para sacar la mano
+                cv2.putText(frame, "¡Saca tu mano ahora!", (cx - 200, cy + 100), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+        
+            # Conteo de juego
+            if conteo <= 2:
+                # Leemos la imagen inicial
+                img = images[conteo]
+                # Redimensionamos
+                img = imutils.resize(img, width=240, height=240)
+                ali, ani, c = img.shape
+
+                # Definimos en que parte de la pantalla esta
+                # Izquierda
+                if x1 < cx:
+                    # Banderas Lado
+                    fizq = True
+                    fder = False
+                    # Mostramos imagen
+                    frame[130: 130 + ali, 350: 350 + ani] = img
+
+                    # Empezamos conteo
+                    # Superamos el Umbral
+                    if y1 < cy - 40 and fd == False:
+                        fu = True
+                        cv2.circle(frame, (cx, cy), 5, (255, 255, 0), -1)
+
+                    # Bajamos del Umbral con Flag
+                    elif y1 > cy - 40 and fu == True:
+                        conteo = conteo + 1
+                        fu = False
+
+                # Derecha
+                elif x1 > cx:
+                    # Banderas Lado
+                    fder = True
+                    fizq = False
+                    # Mostramos la imagen
+                    frame[130: 130 + ali, 30: 30 + ani] = img
+
+                    # Empezamos conteo
+                    # Superamos el Umbral
+                    if y1 < cy - 40 and fd == False:
+                        fu = True
+                        cv2.circle(frame, (cx,cy), 5, (255,255,0), -1)
+
+                    # Bajamos del Umbral con Flag
+                    elif y1 > cy - 40 and fu == True:
+                        conteo = conteo + 1
+                        fu = False
+
+            # Jugamos
+            elif conteo == 3:
+                # Si no hemos jugado jugamos
+                if fj == False and fr == False:
+                    # Elegimos piedra papel o tijera
+                    juego = random.randint(3,5)
+                    fj = True
+
+                # Izquierda
+                if fizq == True and fder == False:
+                    # Mostramos
+                    img = images[juego]
                     # Redimensionamos
                     img = imutils.resize(img, width=240, height=240)
                     ali, ani, c = img.shape
+                    # Mostramos imagen
+                    frame[130: 130 + ali, 350: 350 + ani] = img
+                    print(juego)
 
-                    # Definimos en que parte de la pantalla esta
-                    # Izquierda
-                    if x1 < cx:
-                        # Banderas Lado
-                        fizq = True
+                    # Si ya jugamos
+                    if fj == True and fr == False:
+                        # Extraemos valores de interes
+                        # Punta DI
+                        x2, y2 = lista1[8][1:]
+                        # Punta DC
+                        x3, y3 = lista1[12][1:]
+                        # Punta DA
+                        x4, y4 = lista1[16][1:]
+
+                        # Falange DI
+                        x22, y22 = lista1[6][1:]
+                        # Falange DC
+                        x33, y33 = lista1[10][1:]
+                        # Falange DA
+                        x44, y44 = lista1[14][1:]
+
+                        # Condiciones de posicion
+                        # Piedra
+                        if x2 < x22 and x3 < x33 and x4 < x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # GANA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
+                                fgus = False
+                                femp = False
+                                fr = True
+                                victorias_ia += 1
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # EMPATE
+                                print('EMPATE')
+                                # Bandera Ganador
+                                fgia = False
+                                fgus = False
+                                femp = True
+                                fr = True
+
+                            elif juego == 5:
+                                # GANA USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
+                                fgia = False
+                                fgus = True
+                                femp = False
+                                fr = True
+                                victorias_usuario += 1
+                        # Papel
+                        elif x2 > x22 and x3 > x33 and x4 > x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # EMPATE
+                                print('EMPATE')
+                                fgia = False
+                                fgus = False
+                                fr = True
+                                femp = True
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # GANA USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
+                                fgia = False
+                                fgus = True
+                                femp = False
+                                fr = True
+                                victorias_usuario += 1
+                            elif juego == 5:
+                                # GANA LA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
+                                fgus = False
+                                femp = False
+                                fr = True
+                                victorias_ia += 1
+
+                        # Tijera
+                        elif x2 > x22 and x3 > x33 and x4 < x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # GANA EL USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
+                                fgia = False
+                                fgus = True
+                                femp = False
+                                fr = True
+                                victorias_usuario += 1
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # GANA LA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
+                                fgus = False
+                                femp = False
+                                fr = True
+                                victorias_ia += 1
+                            elif juego == 5:
+                                # EMPATE
+                                print('EMPATE')
+                                fgia = False
+                                fgus = False
+                                femp = True
+                                fr = True
+                    # Mostramos ganador
+                    # IA
+                    if fgia == True:
+                        gan = images[6]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+
+                    # USUARIO
+                    elif fgus == True:
+                        gan = images[7]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+                    # EMPATE
+                    elif femp == True:
+                        gan = images[8]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "¡EMPATE!", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+                    # Incrementar el número de rondas jugadas
+                    rondas_jugadas += 1
+
+                    # Verificar si alguien ha ganado 3 veces
+                    if victorias_usuario == 3 or victorias_ia == 3:
+                        if victorias_usuario == 3:
+                            cv2.putText(frame, "¡GANASTE EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        elif victorias_ia == 3:
+                            cv2.putText(frame, "¡IA GANA EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        
+                        # Mostrar mensaje de reinicio después de la partida completa
+                        cv2.putText(frame, "Presiona 'r' para reiniciar", (120, 450), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                    # Reiniciar juego solo si alguien llegó a 3 victorias y se presiona 'r'
+                    if (t == 82 or t == 114) and (victorias_usuario == 3 or victorias_ia == 3):  # 'R' o 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
                         fder = False
-                        # Mostramos imagen
-                        frame[130: 130 + ali, 350: 350 + ani] = img
-
-                        # Empezamos conteo
-                        # Superamos el Umbral
-                        if y1 < cy - 40 and fd == False:
-                            fu = True
-                            cv2.circle(frame, (cx, cy), 5, (255, 255, 0), -1)
-                            # cv2.line(frame, (cx - cx, cy-40), (an, cy-40), (0, 0, 0), 1)
-
-                        # Bajamos del Umbral con Flag
-                        elif y1 > cy - 40 and fu == True:
-                            conteo = conteo + 1
-                            fu = False
-
-                    # Derecha
-                    elif x1 > cx:
-                        # Banderas Lado
-                        fder = True
                         fizq = False
-                        # Mostramos la imagen
-                        frame[130: 130 + ali, 30: 30 + ani] = img
+                        conteo = 0
+                        victorias_usuario = 0
+                        victorias_ia = 0
+                        rondas_jugadas = 0  # Reiniciar rondas solo cuando se termine el juego
+                # Reset al presionar 'r'
+                    if t == 82 or t == 114:  # 82 es 'R' y 114 es 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
+                        mano_levantada_tiempo = None  # Para la detección del gesto de mano levantada
+                        juego_iniciado = False  # El juego no ha comenzado
+                        contador_activo = False  # El contador no está activo
+                        contador_tiempo = 0  # El tiempo del contador comienza desde 0
+                        contador_etapas = ["Listo", "1", "2", "3"]  # Etapas del contador
+                        contador_indice = 0  # Índice para las etapas del contador
+                        mensaje_agitar = False  # Mensaje de agitar no mostrado
+                        ronda_activa = False  # No hay ronda activa
+                # Derecha
+                if fizq == False and fder == True:
+                    # Mostramos
+                    img = images[juego]
+                    # Redimensionamos
+                    img = imutils.resize(img, width=240, height=240)
+                    ali, ani, c = img.shape
+                    # Mostramos imagen
+                    frame[130: 130 + ali, 30: 30 + ani] = img
+                    print(juego)
 
-                        # Empezamos conteo
-                        # Superamos el Umbral
-                        if y1 < cy - 40 and fd == False:
-                            fu = True
-                            cv2.circle(frame, (cx,cy), 5, (255,255,0), -1)
-                            #cv2.line(frame, (cx - cx, cy-40), (an, cy-40), (0, 0, 0), 1)
+                    # Si ya jugamos
+                    if fj == True and fr == False:
+                        # Extraemos valores de interes
+                        # Punta DI
+                        x2, y2 = lista1[8][1:]
+                        # Punta DC
+                        x3, y3 = lista1[12][1:]
+                        # Punta DA
+                        x4, y4 = lista1[16][1:]
 
-                        # Bajamos del Umbral con Flag
-                        elif y1 > cy - 40 and fu == True:
-                            conteo = conteo + 1
-                            fu = False
-                # Jugamos
-                elif conteo == 3:
-                    # Si no hemos jugado jugamos
-                    if fj == False and fr == False:
-                        # Elegimos piedra papel o tijera
-                        juego = random.randint(3,5)
-                        fj = True
+                        # Falange DI
+                        x22, y22 = lista1[6][1:]
+                        # Falange DC
+                        x33, y33 = lista1[10][1:]
+                        # Falange DA
+                        x44, y44 = lista1[14][1:]
 
-                    # Izquierda
-                    if fizq == True and fder == False:
-                        # Mostramos
-                        img = images[juego]
-                        # Redimensionamos
-                        img = imutils.resize(img, width=240, height=240)
-                        ali, ani, c = img.shape
-                        # Mostramos imagen
-                        frame[130: 130 + ali, 350: 350 + ani] = img
-                        print(juego)
-
-                        # Si ya jugamos
-                        if fj == True and fr == False:
-                            # Extraemos valores de interes
-                            # Punta DI
-                            x2, y2 = lista1[8][1:]
-                            # Punta DC
-                            x3, y3 = lista1[12][1:]
-                            # Punta DA
-                            x4, y4 = lista1[16][1:]
-
-                            # Falange DI
-                            x22, y22 = lista1[6][1:]
-                            # Falange DC
-                            x33, y33 = lista1[10][1:]
-                            # Falange DA
-                            x44, y44 = lista1[14][1:]
-
-                            # Condiciones de posicion
-                            # Piedra
-                            if x2 < x22 and x3 < x33 and x4 < x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # GANA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = False
-                                    femp = True
-                                    fr = True
-
-                                elif juego == 5:
-                                    # GANA USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-
-
-                            # Papel
-                            elif x2 > x22 and x3 > x33 and x4 > x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    fgia = False
-                                    fgus = False
-                                    fr = True
-                                    femp = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # GANA USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-                                elif juego == 5:
-                                    # GANA LA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-
-                            # Tijera
-                            elif x2 > x22 and x3 > x33 and x4 < x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # GANA EL USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # GANA LA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-                                elif juego == 5:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    fgia = False
-                                    fgus = False
-                                    femp = True
-                                    fr = True
-
-                        # Mostramos ganador
-                        # IA
-                        if fgia == True:
-                            # Mostramos
-                            gan = images[6]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
-                                fgia = False
+                        # Condiciones de posicion
+                        # Piedra
+                        if x2 > x22 and x3 > x33 and x4 > x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # GANA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
                                 fgus = False
                                 femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
-
-                        # USUARIO
-                        elif fgus == True:
-                            # Mostramos
-                            gan = images[7]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
+                                fr = True
+                                victorias_ia += 1
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # EMPATE
+                                print('EMPATE')
+                                # Bandera Ganador
                                 fgia = False
                                 fgus = False
+                                femp = True
+                                fr = True
+
+                            elif juego == 5:
+                                # GANA USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
+                                fgia = False
+                                fgus = True
                                 femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
+                                fr = True
+                                victorias_usuario += 1
 
-                        # EMPATE
-                        elif femp == True:
-                            # Mostramos
-                            gan = images[8]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
+                        # Papel
+                        elif x2 < x22 and x3 < x33 and x4 < x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # EMPATE
+                                print('EMPATE')
                                 fgia = False
                                 fgus = False
-                                femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
-
-
-                    # Derecha
-                    if fizq == False and fder == True:
-                        # Mostramos
-                        img = images[juego]
-                        # Redimensionamos
-                        img = imutils.resize(img, width=240, height=240)
-                        ali, ani, c = img.shape
-                        # Mostramos imagen
-                        frame[130: 130 + ali, 30: 30 + ani] = img
-                        print(juego)
-
-                        # Si ya jugamos
-                        if fj == True and fr == False:
-                            # Extraemos valores de interes
-                            # Punta DI
-                            x2, y2 = lista1[8][1:]
-                            # Punta DC
-                            x3, y3 = lista1[12][1:]
-                            # Punta DA
-                            x4, y4 = lista1[16][1:]
-
-                            # Falange DI
-                            x22, y22 = lista1[6][1:]
-                            # Falange DC
-                            x33, y33 = lista1[10][1:]
-                            # Falange DA
-                            x44, y44 = lista1[14][1:]
-
-                            # Condiciones de posicion
-                            # Piedra
-                            if x2 > x22 and x3 > x33 and x4 > x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # GANA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = False
-                                    femp = True
-                                    fr = True
-
-                                elif juego == 5:
-                                    # GANA USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-
-
-                            # Papel
-                            elif x2 < x22 and x3 < x33 and x4 < x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    fgia = False
-                                    fgus = False
-                                    fr = True
-                                    femp = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # GANA USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-                                elif juego == 5:
-                                    # GANA LA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-
-                            # Tijera
-                            elif x2 < x22 and x3 < x33 and x4 > x44:
-                                # IA PAPEL
-                                if juego == 3:
-                                    # GANA EL USUARIO
-                                    print('GANA EL HUMANO')
-                                    # Bandera Ganador
-                                    fgia = False
-                                    fgus = True
-                                    femp = False
-                                    fr = True
-                                # IA PIEDRA
-                                elif juego == 4:
-                                    # GANA LA IA
-                                    print('GANA LA IA')
-                                    # Bandera Ganador
-                                    fgia = True
-                                    fgus = False
-                                    femp = False
-                                    fr = True
-                                elif juego == 5:
-                                    # EMPATE
-                                    print('EMPATE')
-                                    fgia = False
-                                    fgus = False
-                                    femp = True
-                                    fr = True
-
-                        # Mostramos ganador
-                        # IA
-                        if fgia == True:
-                            # Mostramos
-                            gan = images[6]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
+                                fr = True
+                                femp = True
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # GANA USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
                                 fgia = False
+                                fgus = True
+                                femp = False
+                                fr = True
+                                victorias_usuario += 1
+                            elif juego == 5:
+                                # GANA LA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
                                 fgus = False
                                 femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
+                                fr = True
+                                victorias_ia += 1
 
-                        # USUARIO
-                        elif fgus == True:
-                            # Mostramos
-                            gan = images[7]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
+                        # Tijera
+                        elif x2 < x22 and x3 < x33 and x4 > x44:
+                            # IA PAPEL
+                            if juego == 3:
+                                # GANA EL USUARIO
+                                print('GANA EL HUMANO')
+                                # Bandera Ganador
                                 fgia = False
+                                fgus = True
+                                femp = False
+                                fr = True
+                                victorias_usuario += 1
+                            # IA PIEDRA
+                            elif juego == 4:
+                                # GANA LA IA
+                                print('GANA LA IA')
+                                # Bandera Ganador
+                                fgia = True
                                 fgus = False
                                 femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
-
-                        # EMPATE
-                        elif femp == True:
-                            # Mostramos
-                            gan = images[8]
-                            alig, anig, c = gan.shape
-                            # Mostramos imagen
-                            frame[70: 70 + alig, 180: 180 + anig] = gan
-
-                            # Reset
-                            if t == 82 or t == 114:
-                                fs = False
-                                fu = False
-                                fd = False
-                                fj = False
-                                fr = False
+                                fr = True
+                                victorias_ia += 1
+                            elif juego == 5:
+                                # EMPATE
+                                print('EMPATE')
                                 fgia = False
                                 fgus = False
-                                femp = False
-                                fder = False
-                                fizq = False
-                                conteo = 0
+                                femp = True
+                                fr = True
 
+    if jug == 1:
+                     # Mostramos ganador
+                    # IA
+                    if fgia == True:
+                        gan = images[6]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
-    # 0 Jugadores
+                    # USUARIO
+                    elif fgus == True:
+                        gan = images[7]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+                    # EMPATE
+                    elif femp == True:
+                        gan = images[8]
+                        alig, anig, c = gan.shape
+                        frame[70: 70 + alig, 180: 180 + anig] = gan
+                        cv2.putText(frame, "¡EMPATE!", (200, 400), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                        
+                    # Incrementar el número de rondas jugadas
+                    rondas_jugadas += 1
+
+                    # Verificar si alguien ha ganado 3 veces
+                    if victorias_usuario == 3 or victorias_ia == 3:
+                        if victorias_usuario == 3:
+                            cv2.putText(frame, "¡GANASTE EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        elif victorias_ia == 3:
+                            cv2.putText(frame, "¡IA GANA EL JUEGO!", (100, 400), 
+                                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                        
+                        # Mostrar mensaje de reinicio después de la partida completa
+                        cv2.putText(frame, "Presiona 'r' para reiniciar", (120, 450), 
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+                    # Reiniciar juego solo si alguien llegó a 3 victorias y se presiona 'r'
+                    if (t == 82 or t == 114) and (victorias_usuario == 3 or victorias_ia == 3):  # 'R' o 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
+                        victorias_usuario = 0
+                        victorias_ia = 0
+                        rondas_jugadas = 0  # Reiniciar rondas solo cuando se termine el juego
+                # Reset al presionar 'r'
+                    if t == 82 or t == 114:  # 82 es 'R' y 114 es 'r'
+                        fs = False
+                        fu = False
+                        fd = False
+                        fj = False
+                        fr = False
+                        fgia = False
+                        fgus = False
+                        femp = False
+                        fder = False
+                        fizq = False
+                        conteo = 0
+                        mano_levantada_tiempo = None  # Para la detección del gesto de mano levantada
+                        juego_iniciado = False  # El juego no ha comenzado
+                        contador_activo = False  # El contador no está activo
+                        contador_tiempo = 0  # El tiempo del contador comienza desde 0
+                        contador_etapas = ["Listo", "1", "2", "3"]  # Etapas del contador
+                        contador_indice = 0  # Índice para las etapas del contador
+                        mensaje_agitar = False  # Mensaje de agitar no mostrado
+                        ronda_activa = False  # No hay ronda activa
+                        
+
+    # 0 Jugadores (corregida la indentación)
     elif jug == 0:
         # Mostramos jugadores
         cv2.rectangle(frame, (225, 25), (388, 60), (0, 0, 0), -1)
         cv2.putText(frame, '0 JUGADORES', (230, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
 
-        # Mensaje inicio
-        cv2.rectangle(frame, (115, 425), (480, 460), (0, 0, 0), -1)
-        cv2.putText(frame, 'LEVANTA TU MANO PARA INICIAR', (120, 450), cv2.FONT_HERSHEY_SIMPLEX, 0.71, (0, 0, 255), 2)
+        # Mensaje inicio en el centro de la pantalla
+        texto = 'LEVANTE SU MANO PARA INICIAR'
+        tamaño_texto = cv2.getTextSize(texto, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)[0]
+        texto_x = (frame.shape[1] - tamaño_texto[0]) // 2
+        texto_y = (frame.shape[0] + tamaño_texto[1]) // 2
 
+        cv2.rectangle(frame, (texto_x - 10, texto_y - tamaño_texto[1] - 10), (texto_x + tamaño_texto[0] + 10, texto_y + 10), (0, 0, 0), -1)
+        cv2.putText(frame, texto, (texto_x, texto_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
     # Mostramos frames
     cv2.imshow("JUEGO CON AI", frame)
