@@ -37,7 +37,7 @@ FRAME_SKIP = 2  # Procesar 1 de cada 2 frames
 frame_count = 0
 
 # Accedemos a la carpeta
-path = 'Imagenes'
+path = 'Proyecto_ia\Imagenes'
 images = []
 clases = []
 lista = os.listdir(path)
